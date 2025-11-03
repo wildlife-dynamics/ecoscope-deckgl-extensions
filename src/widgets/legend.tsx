@@ -12,7 +12,6 @@ export type LegendValue = {
 
 export type LegendWidgetProps = {
   id: string;
-  title: string;
   legendValues: Record<string, Array<LegendValue>>;
   placement: WidgetPlacement;
   style?: Partial<CSSStyleDeclaration>;
