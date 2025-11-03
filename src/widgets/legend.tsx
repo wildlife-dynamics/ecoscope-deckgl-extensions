@@ -10,9 +10,14 @@ export type LegendValue = {
   color: string;
 }
 
+export type LegendSegment = {
+  title: string;
+  values: Array<LegendValue>;
+}
+
 export type LegendWidgetProps = {
   id: string;
-  legendValues: Record<string, Array<LegendValue>>;
+  legendValues: Array<LegendSegment>;
   placement: WidgetPlacement;
   style?: Partial<CSSStyleDeclaration>;
 }
@@ -36,9 +41,9 @@ export default class LegendWidget extends Widget<LegendWidgetProps> {
       element.style.setProperty(key, value as string);
     });
   
-    Object.entries(this.props.legendValues).map(([header, values])=> {    
+    this.props.legendValues.forEach(({title, values})=> {       
       const titleElement = document.createElement('div');
-      titleElement.innerText = header;
+      titleElement.innerText = title;
       titleElement.classList.add('legend-title');
 
       const legendElement = document.createElement('div');
