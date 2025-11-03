@@ -13,7 +13,7 @@ export type LegendValue = {
 export type LegendWidgetProps = {
   id: string;
   title: string;
-  legendValues: Array<LegendValue>;
+  legendValues: Record<string, Array<LegendValue>>;
   placement: WidgetPlacement;
   style?: Partial<CSSStyleDeclaration>;
 }
@@ -37,32 +37,32 @@ export default class LegendWidget extends Widget<LegendWidgetProps> {
       element.style.setProperty(key, value as string);
     });
   
+    Object.entries(this.props.legendValues).map(([header, values])=> {    
+      const titleElement = document.createElement('div');
+      titleElement.innerText = header;
+      titleElement.classList.add('legend-title');
 
-    const titleElement = document.createElement('div');
-    titleElement.innerText = this.props.title;
-    titleElement.classList.add('legend-title');
+      const legendElement = document.createElement('div');
+      legendElement.classList.add('legend-scale');
 
-    const legendElement = document.createElement('div');
-    legendElement.classList.add('legend-scale');
+      const ul = document.createElement('ul');
+      ul.classList.add('legend-labels');
 
-    const ul = document.createElement('ul');
-    ul.classList.add('legend-labels');
+      values.forEach(({label, color})=> {        
+        const li = document.createElement('li');
+        const span = document.createElement('span');
 
-    this.props.legendValues.forEach(({label, color})=> {
-      const li = document.createElement('li');
-      const span = document.createElement('span');
+        span.style.setProperty('background', color);
+        li.innerText = label;
 
-      span.style.setProperty('background', color);
-      li.innerText = label;
+        li.appendChild(span);
+        ul.appendChild(li);
+      });
 
-      li.appendChild(span);
-      ul.appendChild(li);
+      legendElement.appendChild(ul);
+      element.appendChild(titleElement);
+      element.appendChild(legendElement);
     });
-
-    legendElement.appendChild(ul);
-    element.appendChild(titleElement);
-    element.appendChild(legendElement);
-
     return element;
   }
 }
