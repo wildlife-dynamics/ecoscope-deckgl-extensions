@@ -1,6 +1,6 @@
 {
   "name": "@ecoscope/ecoscope-deck-widgets",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "type": "module",
   "description": "Custom deck.gl components used by ecoscope",
   "main": "index.ts",
