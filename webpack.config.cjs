@@ -6,7 +6,7 @@ module.exports = [
       filename: './bundle.js',
       library: 'ecoscopeDeckWidgets',
       libraryTarget: 'umd',
-      globalObject: 'this',
+      globalObject: 'self',
       umdNamedDefine: true
     },
     resolve: {
