@@ -18,6 +18,7 @@
   "license": "BSD-3-Clause",
   "dependencies": {
     "html-to-image": "^1.11.13",
+    "pmtiles": "^4.4.0",
     "preact": "^10.26.9",
     "preact-jsx-runtime": "^1.2.0",
     "ts-loader": "^9.5.2"
