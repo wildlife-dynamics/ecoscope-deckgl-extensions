@@ -1,5 +1,4 @@
 import {
-  Deck,
   Viewport,
   WebMercatorViewport,
   Widget,

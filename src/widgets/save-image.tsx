@@ -1,5 +1,4 @@
 import {
-  Deck,
   Widget,
   WidgetPlacement,
 } from '@deck.gl/core';
