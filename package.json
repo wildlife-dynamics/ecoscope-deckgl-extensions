@@ -1,5 +1,5 @@
 {
-  "name": "@ecoscope/ecoscope-deck-widgets",
+  "name": "@ecoscope/ecoscope-deckgl-extensions",
   "version": "0.0.6",
   "type": "module",
   "description": "Custom deck.gl components used by ecoscope",
@@ -33,10 +33,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/wildlife-dynamics/ecoscope-deck-widgets.git"
+    "url": "git+https://github.com/wildlife-dynamics/ecoscope-deckgl-extensions.git"
   },
   "bugs": {
-    "url": "https://github.com/wildlife-dynamics/ecoscope-deck-widgets/issues"
+    "url": "https://github.com/wildlife-dynamics/ecoscope-deckgl-extensions/issues"
   },
-  "homepage": "https://github.com/wildlife-dynamics/ecoscope-deck-widgets#readme"
+  "homepage": "https://github.com/wildlife-dynamics/ecoscope-deckgl-extensions#readme"
 }
