@@ -1,6 +1,6 @@
 {
   "name": "@ecoscope/ecoscope-deckgl-extensions",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "type": "module",
   "description": "Custom deck.gl components used by ecoscope",
   "main": "index.ts",
