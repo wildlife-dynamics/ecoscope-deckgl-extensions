@@ -6,7 +6,7 @@ module.exports = [
       filename: './bundle.js',
       library: 'EcoscopeDeckglExtensions',
       libraryTarget: 'umd',
-      globalObject: 'self',
+      globalObject: 'globalThis',
       umdNamedDefine: true
     },
     resolve: {
