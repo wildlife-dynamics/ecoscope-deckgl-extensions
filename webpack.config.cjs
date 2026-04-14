@@ -4,9 +4,9 @@ module.exports = [
     entry: './src/index.ts',
     output: {
       filename: './bundle.js',
-      library: 'ecoscopeDeckWidgets',
+      library: 'EcoscopeDeckglExtensions',
       libraryTarget: 'umd',
-      globalObject: 'this',
+      globalObject: 'globalThis',
       umdNamedDefine: true
     },
     resolve: {
