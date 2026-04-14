@@ -5,7 +5,10 @@
   "description": "Custom deck.gl components used by ecoscope",
   "main": "index.ts",
   "scripts": {
-    "build-webpack": "rm -rf ./dist && mkdir dist && webpack"
+    "build-webpack": "rm -rf ./dist && mkdir dist && webpack",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix"
   },
   "exports": {
     ".": "./dist/bundle.js"
@@ -28,7 +31,9 @@
     "@deck.gl/layers": "^9.2.1",
     "@deck.gl/widgets": "^9.2.1",
     "css-loader": "^7.1.2",
+    "eslint": "^10.2.0",
     "style-loader": "^4.0.0",
+    "typescript-eslint": "^8.58.2",
     "webpack-cli": "^6.0.1"
   },
   "repository": {

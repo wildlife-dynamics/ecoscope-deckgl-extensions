@@ -15,7 +15,7 @@ export default class TiledBitmapLayer extends TileLayer<TiledBitmapLayerProps>{
   };
 
   onTileLoad() {
-    const { widgetId } = this.props as TiledBitmapLayerProps;
+    const { widgetId } = this.props as unknown as TiledBitmapLayerProps;
     if (widgetId) {
       window.parent.postMessage(
         { type: "TileLoaded", widgetId: widgetId },
@@ -24,7 +24,7 @@ export default class TiledBitmapLayer extends TileLayer<TiledBitmapLayerProps>{
     }
   }
   
-  renderSubLayers(props: any) {
+  renderSubLayers(props: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
     const { id, data , ...extraProps } = props;
     const { boundingBox } = props.tile;
     

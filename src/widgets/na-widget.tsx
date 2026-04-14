@@ -1,8 +1,9 @@
 import {
   _GlobeViewport,
+  Deck,
   Viewport,
   WebMercatorViewport,
-  Widget, 
+  Widget,
   WidgetPlacement,
 } from '@deck.gl/core';
 import {render} from 'preact';
@@ -26,7 +27,7 @@ export default class NorthArrowWidget extends Widget<NorthArrowWidgetProps>  {
     this.setProps(props);
   }
 
-  onAdd({deck}) {    
+  onAdd({deck}: {deck: Deck}) {
     const element = document.createElement('div');
     element.classList.add('deck-widget', this.className);
     Object.entries(this.props.style).map(([key, value]) => {

@@ -31,9 +31,9 @@ export default class TitleWidget extends Widget<TitleWidgetProps> {
     this.setProps(props);
   }
 
-  onRenderHTML(rootElement: HTMLElement): void {}
+  onRenderHTML(_rootElement: HTMLElement): void {}
 
-  onAdd({ deck }: { deck: Deck }): HTMLDivElement {
+  onAdd({ deck: _deck }: { deck: Deck }): HTMLDivElement {
     const element = document.createElement('div');
     element.classList.add('deck-widget', this.className);
     Object.entries(this.props.style).map(([key, value]) => {
