@@ -15,10 +15,10 @@ export {default as TooltipWidget} from './widgets/tooltip';
 export {default as TiledBitmapLayer} from './layers/tiled-bitmap-layer';
 
 const _global = (typeof window === 'undefined' ? global : window) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-_global.NorthArrowWidget = {NorthArrowWidget};
-_global.TitleWidget = {TitleWidget};
-_global.ScaleWidget = {ScaleWidget};
-_global.LegendWidget = {LegendWidget};
-_global.SaveImageWidget = {SaveImageWidget};
-_global.TooltipWidget = {TooltipWidget};
-_global.TiledBitmapLayer = {TiledBitmapLayer};
+_global.NorthArrowWidget = NorthArrowWidget;
+_global.TitleWidget = TitleWidget;
+_global.ScaleWidget = ScaleWidget;
+_global.LegendWidget = LegendWidget;
+_global.SaveImageWidget = SaveImageWidget;
+_global.TooltipWidget = TooltipWidget;
+_global.TiledBitmapLayer = TiledBitmapLayer;
