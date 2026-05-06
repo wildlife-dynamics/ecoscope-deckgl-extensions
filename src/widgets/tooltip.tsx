@@ -15,7 +15,7 @@ export type TooltipWidgetProps = {
   layerColumns?: LayerColumns;
 };
 
-const TOOLTIP_CLASS_NAME = 'tooltip';
+const TOOLTIP_CLASS_NAME = 'ecoscope-tooltip';
 const TOOLTIP_STYLE: Partial<CSSStyleDeclaration> = {
   backgroundColor: '#fff',
   boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)',
@@ -27,20 +27,12 @@ export default class TooltipWidget extends Widget<TooltipWidgetProps> {
   id = 'TooltipWidget';
   // The widget API requires a placement but is superfluous here
   placement: WidgetPlacement = 'fill';
-  layerColumns: LayerColumns = {};
   className: string = "ecoscope-tooltip-widget";
-  // Install lazily from onRedraw (post-mount) instead,
-  // so we only buildTooltip once.
   private _installed = false;
 
   constructor(props: TooltipWidgetProps) {
     super(props);
     this.setProps(props);
-  }
-
-  setProps(props: Partial<TooltipWidgetProps>) {
-    this.layerColumns = props.layerColumns ?? this.layerColumns;
-    super.setProps(props);
   }
 
   onRenderHTML(_rootElement: HTMLElement): void {}
@@ -50,24 +42,14 @@ export default class TooltipWidget extends Widget<TooltipWidgetProps> {
     const element = document.createElement('div');
     element.classList.add('deck-widget', this.className);
     element.style.display = 'none';
-    return element;
-  }
 
-  onRedraw(): void {
     if (!this._installed && this.deck) {
       this._installed = true;
       this.deck.setProps({
-        getTooltip: (info: PickingInfo) => buildTooltip(info, this.layerColumns),
+        getTooltip: (info: PickingInfo) => buildTooltip(info, this.props.layerColumns),
       });
     }
-  }
-
-  onRemove(): void {
-    // Restore deck.gl's default (no tooltip) so the widget cleans up after itself.
-    if (this.deck) {
-      this.deck.setProps({ getTooltip: null });
-    }
-    this._installed = false;
+    return element;
   }
 }
 
@@ -79,9 +61,6 @@ type TooltipResult = {
 
 function buildTooltip(info: PickingInfo, layerColumns: LayerColumns): TooltipResult {
   if (!info.object) return null;
-
-  // GeoJsonLayer hands us a Feature with `.properties`; raw record-backed
-  // layers (Scatterplot, Path, ...) hand us the row dict directly.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const properties: Record<string, any> | undefined =
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -94,7 +73,6 @@ function buildTooltip(info: PickingInfo, layerColumns: LayerColumns): TooltipRes
 
   const rows: Array<[string, string]> = [];
   for (const [key, value] of Object.entries(properties)) {
-    if (key === 'geometry') continue;
     if (value === null || value === undefined || value === '') continue;
     if (filterByAllowed && !allowed!.includes(key)) continue;
     rows.push([key, formatValue(value)]);
