@@ -1,6 +1,6 @@
-import tseslint from 'typescript-eslint';
+import { defineConfig } from 'eslint/config';
 
-export default tseslint.config(
+export default tseslint.defineConfig(
   ...tseslint.configs.recommended,
   {
     ignores: ['dist/'],
