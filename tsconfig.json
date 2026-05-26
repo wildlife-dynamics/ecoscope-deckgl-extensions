@@ -5,6 +5,8 @@
     "target": "esnext",
     "module": "esnext",
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
+    "rootDir": "./src",
     "outDir": "dist",
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
