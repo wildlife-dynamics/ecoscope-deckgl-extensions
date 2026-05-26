@@ -1,11 +1,10 @@
 {
   "exclude": ["node_modules", "dist"],
-  "include": ["src/*.ts","src/*.tsx"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "compilerOptions": {
     "target": "esnext",
     "module": "esnext",
-    "moduleResolution": "node",
-    "ignoreDeprecations": "6.0",
+    "moduleResolution": "bundler",
     "rootDir": "./src",
     "outDir": "dist",
     "jsx": "react-jsx",

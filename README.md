@@ -1,12 +1,19 @@
 # ecoscope-deckgl-extensions
 
-Custom [deck.gl](https://deck.gl/) widgets and layers used by [Ecoscope](https://github.com/wildlife-dynamics/ecoscope). Built on `@deck.gl/core` 9.x and rendered with Preact. Bundled to a single UMD file (`dist/bundle.js`) that also attaches each export to `window` for embedding in non-bundled environments (e.g. notebook widgets).
+Custom [deck.gl](https://deck.gl/) widgets and layers used by [Ecoscope](https://github.com/wildlife-dynamics/ecoscope). Built on `@deck.gl/core` 9.x and rendered with Preact.
+
+Ships two artifacts from one source tree:
+
+- **ESM library** (`dist/index.js` + type declarations) — entry for bundler-based apps (Next.js, Vite, etc.).
+- **UMD bundle** (`dist/bundle.js`) — single-file build with `@deck.gl/*` externalized to a `deck` global, intended for pydeck's `customLibraries` script-tag loading. Attaches all exports to `window.EcoscopeDeckglExtensions`.
 
 ## Install
 
 ```bash
 npm install @ecoscope/ecoscope-deckgl-extensions
 ```
+
+`@deck.gl/*`, `@geoarrow/deck.gl-geoarrow`, and `apache-arrow` are peer dependencies — the consuming app provides them. `@geoarrow/geoparquet-wasm` is an optional peer (only needed if you load `.parquet` data through the GeoArrow layers).
 
 ```ts
 import {
@@ -17,8 +24,34 @@ import {
   SaveImageWidget,
   TooltipWidget,
   TiledBitmapLayer,
+  GeoArrowPathLayer,
+  GeoArrowScatterplotLayer,
+  GeoArrowPolygonLayer,
 } from '@ecoscope/ecoscope-deckgl-extensions';
 ```
+
+## Next.js consumer setup
+
+The widget CSS and the GeoParquet wasm path need a small amount of `next.config.js` to work end-to-end:
+
+```js
+// next.config.js
+module.exports = {
+  // Lets Next's bundler process our source — handles CSS imports inside widgets
+  // and ESM-strict `.js` resolution. Required.
+  transpilePackages: ['@ecoscope/ecoscope-deckgl-extensions'],
+
+  webpack(config) {
+    // Required only if you use GeoArrowPathLayer / Scatterplot / Polygon with
+    // `data: "<url>.parquet"`. The GeoParquetLoader dynamically imports
+    // @geoarrow/geoparquet-wasm, which needs async wasm support.
+    config.experiments = { ...config.experiments, asyncWebAssembly: true };
+    return config;
+  },
+};
+```
+
+deck.gl is browser-only, so any component that constructs layers/widgets from this package must live behind a `'use client'` boundary (App Router) or be imported dynamically with `ssr: false`.
 
 ## Widgets
 
@@ -89,7 +122,12 @@ new TiledBitmapLayer({
 ## Development
 
 ```bash
-npm run build-webpack   # bundle to dist/
+npm run build           # ESM library + UMD bundle to dist/
+npm run build:lib       # ESM library only (dist/index.js + .d.ts tree)
+npm run build:bundle    # UMD bundle only (dist/bundle.js) — for pydeck
+npm run build-webpack   # legacy alias for build:bundle
 npm run typecheck
 npm run lint
 ```
+
+`scripts/sync-version.cjs` regenerates `src/version.ts` from `package.json` and runs automatically as part of every build/typecheck script.
