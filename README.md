@@ -30,27 +30,6 @@ import {
 } from '@ecoscope/ecoscope-deckgl-extensions';
 ```
 
-## Next.js consumer setup
-
-The widget CSS and the GeoParquet wasm path need a small amount of `next.config.js` to work end-to-end:
-
-```js
-// next.config.js
-module.exports = {
-  // Lets Next's bundler process our source — handles CSS imports inside widgets
-  // and ESM-strict `.js` resolution. Required.
-  transpilePackages: ['@ecoscope/ecoscope-deckgl-extensions'],
-
-  webpack(config) {
-    // Required only if you use GeoArrowPathLayer / Scatterplot / Polygon with
-    // `data: "<url>.parquet"`. The GeoParquetLoader dynamically imports
-    // @geoarrow/geoparquet-wasm, which needs async wasm support.
-    config.experiments = { ...config.experiments, asyncWebAssembly: true };
-    return config;
-  },
-};
-```
-
 deck.gl is browser-only, so any component that constructs layers/widgets from this package must live behind a `'use client'` boundary (App Router) or be imported dynamically with `ssr: false`.
 
 ## Widgets

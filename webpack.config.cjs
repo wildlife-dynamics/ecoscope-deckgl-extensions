@@ -32,8 +32,6 @@ module.exports = [
     },
     target: 'web',
     experiments: {
-      // @geoarrow/geoparquet-wasm ships ESM with a wasm import; async is
-      // sufficient. Sync wasm is the discouraged path and we don't need it.
       asyncWebAssembly: true,
     },
     externals: {
