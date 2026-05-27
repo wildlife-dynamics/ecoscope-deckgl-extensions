@@ -22,13 +22,6 @@ module.exports = [
     },
     resolve: {
       extensions: ['.tsx', '.ts', '.js', '.jsx'],
-      // Source uses explicit `.js` on relative imports for Node ESM-strict
-      // compat (Next.js, plain Node, etc.). Map those back to `.ts`/`.tsx`
-      // when webpack resolves against our source tree.
-      extensionAlias: {
-        '.js': ['.ts', '.tsx', '.js'],
-        '.jsx': ['.tsx', '.jsx'],
-      },
     },
     target: 'web',
     experiments: {

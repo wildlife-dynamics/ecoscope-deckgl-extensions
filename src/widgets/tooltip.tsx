@@ -84,15 +84,13 @@ function buildTooltip(info: PickingInfo, layerColumns: LayerColumns): TooltipRes
   const rows: Array<[string, string]> = [];
   for (const key of keys) {
     if (filterByAllowed && !allowed!.includes(key)) continue;
-    let value: unknown;
     try {
-      value = properties[key];
+      const value = properties[key];
+      if (value === null || value === undefined || value === '') continue;
+      rows.push([key, formatValue(value)]);
     } catch (e) {
-      console.debug(`[TooltipWidget] failed to read property '${key}':`, e);
-      continue;
+      console.debug(`[TooltipWidget] failed to read or format property '${key}':`, e);
     }
-    if (value === null || value === undefined || value === '') continue;
-    rows.push([key, formatValue(value)]);
   }
 
   if (rows.length === 0) return null;

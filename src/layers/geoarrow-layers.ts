@@ -11,7 +11,7 @@ import type {
 } from '@geoarrow/deck.gl-geoarrow';
 import type * as arrow from 'apache-arrow';
 
-import { GeoParquetLoader } from '../loaders/geoparquet-loader.js';
+import { GeoParquetLoader } from '../loaders/geoparquet-loader';
 
 type RenderLayersReturn = Layer | LayersList | null;
 

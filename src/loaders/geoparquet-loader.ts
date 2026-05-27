@@ -1,7 +1,7 @@
 import type { LoaderContext, LoaderWithParser } from '@loaders.gl/loader-utils';
 import type * as arrow from 'apache-arrow';
 
-import { VERSION } from '../version.js';
+import { VERSION } from '../version';
 
 const PARQUET_MAGIC = [0x50, 0x41, 0x52, 0x31]; // "PAR1"
 
