@@ -84,91 +84,58 @@ export function resolveAccessors(
 }
 
 /**
- * Run `super.renderLayers` with the layer's props extended — never mutated —
- * so the upstream layer reads our resolved column-reference accessors.
- *
- * Constraints stacked against us:
- *
- * - Mutation is impossible: deck.gl freezes the props instance per render
- *   cycle (see `Object.freeze(propsInstance)` in
- *   `modules/core/src/lifecycle/create-props.ts`).
- * - Proxy substitution is forbidden by the language for frozen own data
- *   properties: the Proxy `get` invariant requires the actual value be
- *   reported. So we can't return a different `getFillColor` value through
- *   a Proxy over the real props.
- * - The `Object.create(realProps)` prototype-shadowing pattern deck.gl
- *   itself uses for uniform transitions doesn't work here either: the
- *   upstream geoarrow layer iterates props via `Object.entries` (in
- *   `extractAccessorsFromProps`), which returns *own* properties only.
- *
- * So we build a flat shadow: copy every enumerable prop from the real
- * props as an own property on a fresh object, applying our resolved
- * overrides on top. Reading `layer.props[key]` during the copy triggers
- * inherited async accessors (e.g. the resolved `data` getter) so we
- * capture the already-resolved values rather than the prototype machinery.
+ * Build per-batch props for an upstream layer instance: copy every enumerable
+ * prop from the real layer (own + inherited — captures deck.gl's
+ * async-resolved `data` getter), apply our resolved column → arrow.Data
+ * overrides, and stamp in this batch as `data` plus a batch-suffixed id so
+ * sub-layer ids stay unique across batches.
  */
-export function renderWithResolvedAccessors<T extends LayerLike>(
-  layer: T,
-  superRenderLayers: () => RenderLayersReturn,
-): RenderLayersReturn {
-  const batch = layer.props.data;
-  if (!isRecordBatch(batch)) return superRenderLayers.call(layer);
+function buildBatchProps(
+  layer: LayerLike,
+  batch: arrow.RecordBatch,
+  batchIndex: number,
+): Record<string, unknown> {
   const resolved = resolveAccessors(layer, batch);
-  if (resolved === null) return superRenderLayers.call(layer);
-
-  const shadowProps: Record<string, unknown> = {};
+  const subProps: Record<string, unknown> = {};
   for (const key in layer.props) {
-    shadowProps[key] = resolved.has(key) ? resolved.get(key) : layer.props[key];
+    subProps[key] = resolved?.has(key) ? resolved.get(key) : layer.props[key];
   }
-
-  const thisProxy = new Proxy(layer, {
-    get(target, key) {
-      if (key === 'props') return shadowProps;
-      // Forward everything else with the real layer as receiver so methods
-      // reached via the proxy still bind internal `this` against the real
-      // instance — but the `this` of super.renderLayers itself stays the
-      // proxy, which is what makes `this.props` see shadowProps.
-      return Reflect.get(target as object, key, target);
-    },
-  });
-
-  return superRenderLayers.call(thisProxy);
+  subProps.data = batch;
+  subProps.id = `${layer.id ?? 'GeoArrowLayer'}-batch-${batchIndex}`;
+  return subProps;
 }
 
 /**
- * Multi-batch path: when `data` is an arrow.Table, instantiate one upstream
- * layer per RecordBatch, each with per-batch accessor resolution and a
- * derived id (so sub-layer ids don't collide across batches). Direct
- * instantiation rather than the proxy trick because we also need a distinct
- * `this.id` per batch — upstream's `getSubLayerProps` reads the instance
- * property, not `props.id`, so shadowing props alone wouldn't be enough.
+ * Always instantiate upstream layers directly: N per batch for arrow.Table,
+ * one for a single arrow.RecordBatch. Returns null when `data` is neither
+ * (e.g. URL still loading) so the caller can fall back to super.renderLayers.
+ *
+ * Direct construction rather than a proxy/shadow-props trick over upstream's
+ * renderLayers because we need each sub-layer to have its own `this.id`
+ * (upstream's `getSubLayerProps` reads the instance property, not
+ * `props.id`), and one extra composite-layer hop is cheaper to reason about
+ * than the proxy mechanics.
  */
-function renderTableBatches(
-  LayerClass: new (props: Record<string, unknown>) => Layer,
+function renderBatchedData(
+  LayerClass: new (p: Record<string, unknown>) => Layer,
   layer: LayerLike,
-  table: arrow.Table,
-): LayersList {
-  const sublayers: Layer[] = [];
-  for (let i = 0; i < table.batches.length; i++) {
-    const batch = table.batches[i];
-    const resolved = resolveAccessors(layer, batch);
-    const subProps: Record<string, unknown> = {};
-    for (const key in layer.props) {
-      subProps[key] = resolved?.has(key) ? resolved.get(key) : layer.props[key];
-    }
-    subProps.data = batch;
-    subProps.id = `${layer.id ?? 'GeoArrowLayer'}-batch-${i}`;
-    sublayers.push(new LayerClass(subProps));
+): RenderLayersReturn {
+  const data = layer.props.data;
+  if (isArrowTable(data)) {
+    return data.batches.map((b, i) => new LayerClass(buildBatchProps(layer, b, i)));
   }
-  return sublayers;
+  if (isRecordBatch(data)) {
+    return new LayerClass(buildBatchProps(layer, data, 0));
+  }
+  return null;
 }
 
 // Thin subclasses that (a) inject our GeoParquet loader via defaultProps —
 // the loaders.gl 4.x per-layer convention, not the deprecated global
-// `registerLoaders` — and (b) route renderLayers through the column-
-// reference resolver so pydeck's `@@=column` sugar and bare column-name
-// strings both work as accessor sources for GeoArrow layers. Multi-batch
-// arrow.Table inputs are split into one upstream sub-layer per batch.
+// `registerLoaders` — and (b) re-emit one upstream layer per RecordBatch,
+// applying bare-string column refs as vectorized arrow attributes on the way
+// through. When `data` is still a URL (loader hasn't resolved yet),
+// renderLayers falls back to upstream's own behavior.
 
 export class GeoArrowPathLayer<ExtraProps extends object = object> extends UpstreamGeoArrowPathLayer<ExtraProps> {
   static layerName = 'GeoArrowPathLayer';
@@ -181,15 +148,10 @@ export class GeoArrowPathLayer<ExtraProps extends object = object> extends Upstr
   };
 
   renderLayers(): RenderLayersReturn {
-    const data = this.props.data;
-    if (isArrowTable(data)) {
-      return renderTableBatches(
-        UpstreamGeoArrowPathLayer as unknown as new (p: Record<string, unknown>) => Layer,
-        this as unknown as LayerLike,
-        data,
-      );
-    }
-    return renderWithResolvedAccessors(this as unknown as LayerLike, super.renderLayers);
+    return renderBatchedData(
+      UpstreamGeoArrowPathLayer as unknown as new (p: Record<string, unknown>) => Layer,
+      this as unknown as LayerLike,
+    ) ?? super.renderLayers();
   }
 }
 
@@ -201,15 +163,10 @@ export class GeoArrowScatterplotLayer<ExtraProps extends object = object> extend
   };
 
   renderLayers(): RenderLayersReturn {
-    const data = this.props.data;
-    if (isArrowTable(data)) {
-      return renderTableBatches(
-        UpstreamGeoArrowScatterplotLayer as unknown as new (p: Record<string, unknown>) => Layer,
-        this as unknown as LayerLike,
-        data,
-      );
-    }
-    return renderWithResolvedAccessors(this as unknown as LayerLike, super.renderLayers);
+    return renderBatchedData(
+      UpstreamGeoArrowScatterplotLayer as unknown as new (p: Record<string, unknown>) => Layer,
+      this as unknown as LayerLike,
+    ) ?? super.renderLayers();
   }
 }
 
@@ -221,14 +178,9 @@ export class GeoArrowPolygonLayer<ExtraProps extends object = object> extends Up
   };
 
   renderLayers(): RenderLayersReturn {
-    const data = this.props.data;
-    if (isArrowTable(data)) {
-      return renderTableBatches(
-        UpstreamGeoArrowPolygonLayer as unknown as new (p: Record<string, unknown>) => Layer,
-        this as unknown as LayerLike,
-        data,
-      );
-    }
-    return renderWithResolvedAccessors(this as unknown as LayerLike, super.renderLayers);
+    return renderBatchedData(
+      UpstreamGeoArrowPolygonLayer as unknown as new (p: Record<string, unknown>) => Layer,
+      this as unknown as LayerLike,
+    ) ?? super.renderLayers();
   }
 }
