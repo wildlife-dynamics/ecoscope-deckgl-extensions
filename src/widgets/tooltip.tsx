@@ -104,8 +104,6 @@ function buildTooltip(info: PickingInfo, layerColumns: LayerColumns): TooltipRes
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function formatValue(value: any): string {
   if (typeof value === 'bigint') return value.toString();
-  // Date plus Date-like scalar wrappers (Luxon DateTime, dayjs, the
-  // scalar form arrow Date32/Date64 columns surface as).
   if (
     value !== null &&
     typeof value === 'object' &&

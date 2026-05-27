@@ -6,16 +6,11 @@ import { VERSION } from '../version';
 const PARQUET_MAGIC = [0x50, 0x41, 0x52, 0x31]; // "PAR1"
 
 /**
- * loaders.gl Loader for GeoParquet files. Wired into the GeoArrow* layer
- * subclasses via `static defaultProps.loaders = [GeoParquetLoader]` in
- * `src/layers/geoarrow-layers.ts` — the loaders.gl 4.x per-layer injection
- * path, rather than the deprecated `registerLoaders` global.
+ * loaders.gl Loader for GeoParquet files. Intended specifically 
+ * for use with the GeoArrowLayer wrappers in this package.
  *
  * Returns an arrow.Table (not a single RecordBatch) so the layer subclasses
  * can render multi-row-group files as one upstream sub-layer per batch.
- *
- * The wasm + arrow deps are dynamically imported so they live in a
- * code-split chunk and don't bloat the sync module graph.
  */
 export const GeoParquetLoader: LoaderWithParser<arrow.Table> = {
   name: 'GeoParquet',
@@ -64,11 +59,6 @@ async function parseGeoParquetInner(arrayBuffer: ArrayBuffer): Promise<arrow.Tab
     import('apache-arrow'),
   ]);
   const buffer = new Uint8Array(arrayBuffer);
-  // `intoIPCStream` *consumes* the wasm-side Table (Rust `into` convention,
-  // confirmed in @geoarrow/geoparquet-wasm's d.ts: "Consume this table and
-  // convert to an Arrow IPC Stream buffer"). It drops the wasm allocation
-  // for us — calling `.free()` afterward would be a double-free and produce
-  // a "null pointer passed to rust" runtime error.
   const ipc = readGeoParquet(buffer).intoIPCStream();
   const table = arrowMod.tableFromIPC(ipc);
   if (table.batches.length === 0) {

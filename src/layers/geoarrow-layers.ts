@@ -46,16 +46,7 @@ export function isArrowTable(value: unknown): value is arrow.Table {
  * Walk every `get*` accessor declared in the layer class's `defaultProps`
  * (a closed set — we don't speculate over arbitrary `for...in` props) and
  * build a propName → arrow.Data map for those whose value is a bare string
- * column name. Functions are left alone for upstream's per-row evaluation.
- *
- * The supported shape is `getFillColor: "column_name"` — not
- * `getFillColor: "@@=column_name"`. We don't try to peer into JSON-lowered
- * expression closures: `@deck.gl/json` lowers expressions to opaque
- * evaluator wrappers (`n => Jae(n, ast)`) whose column refs live in a
- * captured AST, not in the function body, and the runtime probe needed to
- * extract them silently mis-resolves on any non-trivial expression. The
- * pydeck side should emit bare strings for column references on these
- * layers; everything else passes through to upstream as-is.
+ * column name.
  *
  * Returns null when nothing needed resolution.
  */
@@ -84,9 +75,8 @@ export function resolveAccessors(
 }
 
 /**
- * Build per-batch props for an upstream layer instance: copy every enumerable
- * prop from the real layer (own + inherited — captures deck.gl's
- * async-resolved `data` getter), apply our resolved column → arrow.Data
+ * Build per-batch props for an upstream layer instance: copy from the 
+ * real layer, apply our resolved column → arrow.Data
  * overrides, and stamp in this batch as `data` plus a batch-suffixed id so
  * sub-layer ids stay unique across batches.
  */
@@ -109,12 +99,6 @@ function buildBatchProps(
  * Always instantiate upstream layers directly: N per batch for arrow.Table,
  * one for a single arrow.RecordBatch. Returns null when `data` is neither
  * (e.g. URL still loading) so the caller can fall back to super.renderLayers.
- *
- * Direct construction rather than a proxy/shadow-props trick over upstream's
- * renderLayers because we need each sub-layer to have its own `this.id`
- * (upstream's `getSubLayerProps` reads the instance property, not
- * `props.id`), and one extra composite-layer hop is cheaper to reason about
- * than the proxy mechanics.
  */
 function renderBatchedData(
   LayerClass: new (p: Record<string, unknown>) => Layer,
@@ -130,12 +114,10 @@ function renderBatchedData(
   return null;
 }
 
-// Thin subclasses that (a) inject our GeoParquet loader via defaultProps —
-// the loaders.gl 4.x per-layer convention, not the deprecated global
-// `registerLoaders` — and (b) re-emit one upstream layer per RecordBatch,
+// Thin subclasses that (a) inject our GeoParquet loader via defaultProps 
+// and (b) re-emit one upstream layer per RecordBatch,
 // applying bare-string column refs as vectorized arrow attributes on the way
-// through. When `data` is still a URL (loader hasn't resolved yet),
-// renderLayers falls back to upstream's own behavior.
+// through, allowing definition of these layers via json / pydeck
 
 export class GeoArrowPathLayer<ExtraProps extends object = object> extends UpstreamGeoArrowPathLayer<ExtraProps> {
   static layerName = 'GeoArrowPathLayer';

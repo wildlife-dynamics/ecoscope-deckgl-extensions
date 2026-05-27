@@ -4,8 +4,8 @@ Custom [deck.gl](https://deck.gl/) widgets and layers used by [Ecoscope](https:/
 
 Ships two artifacts from one source tree:
 
-- **ESM library** (`dist/index.js` + type declarations) — entry for bundler-based apps (Next.js, Vite, etc.).
-- **UMD bundle** (`dist/bundle.js`) — single-file build with `@deck.gl/*` externalized to a `deck` global, intended for pydeck's `customLibraries` script-tag loading. Attaches all exports to `window.EcoscopeDeckglExtensions`.
+- **ESM library** (`dist/index.js` + type declarations) — entry for bundler-based apps (ie Next.js).
+- **UMD bundle** (`dist/bundle.js`) — single-file build intended for pydeck's `customLibraries` script-tag loading. Attaches all exports to `window.EcoscopeDeckglExtensions`.
 
 ## Install
 
@@ -102,10 +102,7 @@ new TiledBitmapLayer({
 Thin subclasses of the corresponding [`@geoarrow/deck.gl-geoarrow`](https://github.com/geoarrow/deck.gl-geoarrow) layers that add:
 
 - A bundled GeoParquet loader (`.parquet` URLs in `data` are parsed in-browser via `@geoarrow/geoparquet-wasm`, wired in via `defaultProps.loaders` — no global `registerLoaders` call needed).
-- Multi-row-group parquet support: files with N row groups are rendered as N upstream sub-layers, one per `arrow.RecordBatch`, with ids derived as `${layer.id}-batch-${i}`.
-- **Bare-string column references on `get*` accessors.** Set `getFillColor: "color_column"` and the named column is bound directly as a vectorized arrow attribute on the upstream layer. This is the supported pydeck shape — **not** `getFillColor: "@@=color_column"`. `@deck.gl/json` lowers `@@=` expressions to opaque evaluator closures whose column refs aren't recoverable from the function body, so column references for these layers must be sent as plain strings.
-
-Functions on `get*` props still work — they go through upstream's per-row evaluation unchanged.
+- Bare-string column references on `get*` accessors.** Set `getFillColor: "color_column"` and the named column is bound directly as a vectorized arrow attribute on the upstream layer. Allows defining accessors in terms of columns via Pydeck.
 
 ```ts
 new GeoArrowScatterplotLayer({
