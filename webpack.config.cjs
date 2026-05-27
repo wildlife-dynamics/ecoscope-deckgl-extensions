@@ -34,11 +34,6 @@ module.exports = [
       "@deck.gl/widgets": "deck",
       "@deck.gl/aggregation-layers": "deck",
     },
-    devServer: {
-      contentBase: __dirname,
-      writeToDisk: true,
-      port: 8080
-    },
     module:{
       rules: [
         {

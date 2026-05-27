@@ -71,18 +71,10 @@ function buildTooltip(info: PickingInfo, layerColumns: LayerColumns): TooltipRes
   const allowed = layerId ? layerColumns?.[layerId] : null;
   const filterByAllowed = Array.isArray(allowed);
 
-
-  let keys: string[] = [];
-  try {
-    keys = Object.keys(properties);
-  } catch {
-    return null;
-  }
-
-  // Enumerate keys defensively: isolate the read for each field
-  // so one problematic column doesn't take out the whole tooltip.
+  // Read each field inside a try so one bad getter (e.g. an arrow column
+  // that throws on access) doesn't take out the whole tooltip.
   const rows: Array<[string, string]> = [];
-  for (const key of keys) {
+  for (const key of Object.keys(properties)) {
     if (filterByAllowed && !allowed!.includes(key)) continue;
     try {
       const value = properties[key];
@@ -112,7 +104,15 @@ function buildTooltip(info: PickingInfo, layerColumns: LayerColumns): TooltipRes
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function formatValue(value: any): string {
   if (typeof value === 'bigint') return value.toString();
-  if (value instanceof Date) return value.toISOString();
+  // Date plus Date-like scalar wrappers (Luxon DateTime, dayjs, the
+  // scalar form arrow Date32/Date64 columns surface as).
+  if (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as { toISOString?: unknown }).toISOString === 'function'
+  ) {
+    return (value as Date).toISOString();
+  }
   if (typeof value === 'object') {
     try {
       return JSON.stringify(value, (_k, v) =>
@@ -120,20 +120,10 @@ function formatValue(value: any): string {
       );
     } catch (e) {
       console.debug('[TooltipWidget] JSON.stringify failed, falling back to String():', e);
-      try {
-        return String(value);
-      } catch (e2) {
-        console.debug('[TooltipWidget] String() also failed, dropping value:', e2);
-        return '';
-      }
+      return String(value);
     }
   }
-  try {
-    return String(value);
-  } catch (e) {
-    console.debug('[TooltipWidget] String() failed, dropping value:', e);
-    return '';
-  }
+  return String(value);
 }
 
 function escapeHtml(s: string): string {

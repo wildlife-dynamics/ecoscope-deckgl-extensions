@@ -15,7 +15,7 @@
   },
   "scripts": {
     "build": "rm -rf dist && npm run build:lib && npm run build:bundle",
-    "build:lib": "tsup src/index.ts --format esm --dts --clean --minify --target esnext --external preact --external @deck.gl/core --external @deck.gl/layers --external @deck.gl/geo-layers --external @deck.gl/widgets --external @deck.gl/aggregation-layers --external @geoarrow/deck.gl-geoarrow --external apache-arrow",
+    "build:lib": "tsup src/index.ts --format esm --dts --clean --target esnext --external preact --external @deck.gl/core --external @deck.gl/layers --external @deck.gl/geo-layers --external @deck.gl/widgets --external @deck.gl/aggregation-layers --external @geoarrow/deck.gl-geoarrow --external @geoarrow/geoparquet-wasm --external @loaders.gl/loader-utils --external apache-arrow",
     "build:bundle": "webpack",
     "build-webpack": "npm run build:bundle",
     "typecheck": "tsc --noEmit",
@@ -23,7 +23,6 @@
     "lint:fix": "eslint src/ --fix"
   },
   "files": [
-    "src",
     "dist"
   ],
   "author": "",
@@ -34,7 +33,6 @@
     "preact-jsx-runtime": "^1.2.0"
   },
   "peerDependencies": {
-    "@deck.gl/aggregation-layers": "^9.2.0",
     "@deck.gl/core": "^9.2.0",
     "@deck.gl/geo-layers": "^9.2.0",
     "@deck.gl/layers": "^9.2.0",

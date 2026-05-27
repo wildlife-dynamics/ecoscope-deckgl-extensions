@@ -126,5 +126,3 @@ npm run build-webpack   # legacy alias for build:bundle
 npm run typecheck
 npm run lint
 ```
-
-`scripts/sync-version.cjs` regenerates `src/version.ts` from `package.json` and runs automatically as part of every build/typecheck script.
