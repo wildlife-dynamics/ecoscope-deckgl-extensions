@@ -88,22 +88,22 @@ export default class ScaleWidget extends Widget<ScaleWidgetProps> {
               x="42.5%"
               y="22%"
             />
-            <text id="zero" textAnchor="middle" fontSize="20" x="5%" y="95%">
+            <text id="zero" text-anchor="middle" font-size="20" x="5%" y="95%">
               0
             </text>
             <text
               id="half_scale"
-              fontSize="20"
-              textAnchor="middle"
+              font-size="20"
+              text-anchor="middle"
               x="42.5%"
               y="95%"
             >
               {distance / 2}
             </text>
-            <text id="scale" fontSize="20" textAnchor="middle" x="80%" y="95%">
+            <text id="scale" font-size="20" text-anchor="middle" x="80%" y="95%">
               {distance}
             </text>
-            <text id="unit" fontSize="20" x="82%" y="42%">
+            <text id="unit" font-size="20" x="82%" y="42%">
               {label}
             </text>
           </svg>
