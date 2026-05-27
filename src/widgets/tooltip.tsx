@@ -71,10 +71,28 @@ function buildTooltip(info: PickingInfo, layerColumns: LayerColumns): TooltipRes
   const allowed = layerId ? layerColumns?.[layerId] : null;
   const filterByAllowed = Array.isArray(allowed);
 
+  // Enumerate keys defensively: for GeoArrow-backed layers, `properties`
+  // is an apache-arrow row proxy whose property accessors can throw (e.g.
+  // BigInt-vs-Number mixing in offset arithmetic for some column types).
+  // We isolate the read for each field so one problematic column doesn't
+  // take out the whole tooltip.
+  let keys: string[] = [];
+  try {
+    keys = Object.keys(properties);
+  } catch {
+    return null;
+  }
+
   const rows: Array<[string, string]> = [];
-  for (const [key, value] of Object.entries(properties)) {
-    if (value === null || value === undefined || value === '') continue;
+  for (const key of keys) {
     if (filterByAllowed && !allowed!.includes(key)) continue;
+    let value: unknown;
+    try {
+      value = properties[key];
+    } catch {
+      continue;
+    }
+    if (value === null || value === undefined || value === '') continue;
     rows.push([key, formatValue(value)]);
   }
 
@@ -96,14 +114,31 @@ function buildTooltip(info: PickingInfo, layerColumns: LayerColumns): TooltipRes
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function formatValue(value: any): string {
+  // Int64 columns surface as BigInt from apache-arrow row proxies; cast to
+  // string. Timestamp columns are converted to ISO strings upstream in
+  // `persist_arrow`, so we don't reach for the batch schema here. Parquets
+  // not produced by `persist_arrow` whose timestamps come through as raw
+  // BigInt nanoseconds render as integer strings — a known limitation.
+  if (typeof value === 'bigint') return value.toString();
+  if (value instanceof Date) return value.toISOString();
   if (typeof value === 'object') {
     try {
-      return JSON.stringify(value);
+      return JSON.stringify(value, (_k, v) =>
+        typeof v === 'bigint' ? v.toString() : v,
+      );
     } catch {
-      return String(value);
+      try {
+        return String(value);
+      } catch {
+        return '';
+      }
     }
   }
-  return String(value);
+  try {
+    return String(value);
+  } catch {
+    return '';
+  }
 }
 
 function escapeHtml(s: string): string {
