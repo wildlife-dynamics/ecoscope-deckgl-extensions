@@ -79,7 +79,7 @@ function buildTooltip(info: PickingInfo, layerColumns: LayerColumns): TooltipRes
     return null;
   }
 
-  // Enumerate keys defensively: isolate the read for each field 
+  // Enumerate keys defensively: isolate the read for each field
   // so one problematic column doesn't take out the whole tooltip.
   const rows: Array<[string, string]> = [];
   for (const key of keys) {
@@ -87,7 +87,8 @@ function buildTooltip(info: PickingInfo, layerColumns: LayerColumns): TooltipRes
     let value: unknown;
     try {
       value = properties[key];
-    } catch {
+    } catch (e) {
+      console.debug(`[TooltipWidget] failed to read property '${key}':`, e);
       continue;
     }
     if (value === null || value === undefined || value === '') continue;
@@ -119,17 +120,20 @@ function formatValue(value: any): string {
       return JSON.stringify(value, (_k, v) =>
         typeof v === 'bigint' ? v.toString() : v,
       );
-    } catch {
+    } catch (e) {
+      console.debug('[TooltipWidget] JSON.stringify failed, falling back to String():', e);
       try {
         return String(value);
-      } catch {
+      } catch (e2) {
+        console.debug('[TooltipWidget] String() also failed, dropping value:', e2);
         return '';
       }
     }
   }
   try {
     return String(value);
-  } catch {
+  } catch (e) {
+    console.debug('[TooltipWidget] String() failed, dropping value:', e);
     return '';
   }
 }

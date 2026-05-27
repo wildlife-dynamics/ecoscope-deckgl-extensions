@@ -1,4 +1,4 @@
-import type { LoaderWithParser } from '@loaders.gl/loader-utils';
+import type { LoaderContext, LoaderWithParser } from '@loaders.gl/loader-utils';
 import type * as arrow from 'apache-arrow';
 
 import { VERSION } from '../version.js';
@@ -11,10 +11,13 @@ const PARQUET_MAGIC = [0x50, 0x41, 0x52, 0x31]; // "PAR1"
  * `src/layers/geoarrow-layers.ts` — the loaders.gl 4.x per-layer injection
  * path, rather than the deprecated `registerLoaders` global.
  *
+ * Returns an arrow.Table (not a single RecordBatch) so the layer subclasses
+ * can render multi-row-group files as one upstream sub-layer per batch.
+ *
  * The wasm + arrow deps are dynamically imported so they live in a
  * code-split chunk and don't bloat the sync module graph.
  */
-export const GeoParquetLoader: LoaderWithParser<arrow.RecordBatch> = {
+export const GeoParquetLoader: LoaderWithParser<arrow.Table> = {
   name: 'GeoParquet',
   id: 'geoparquet',
   module: 'ecoscope-deckgl-extensions',
@@ -36,7 +39,26 @@ export const GeoParquetLoader: LoaderWithParser<arrow.RecordBatch> = {
   parse: parseGeoParquet,
 };
 
-export async function parseGeoParquet(arrayBuffer: ArrayBuffer): Promise<arrow.RecordBatch> {
+export async function parseGeoParquet(
+  arrayBuffer: ArrayBuffer,
+  _options?: unknown,
+  context?: LoaderContext,
+): Promise<arrow.Table> {
+  try {
+    return await parseGeoParquetInner(arrayBuffer);
+  } catch (e) {
+    // Wrap so the source URL (or filename) is in the message — wasm/arrow
+    // errors on their own give no hint which file they came from.
+    const source = context?.url ?? context?.filename;
+    const detail = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      source ? `Failed to parse GeoParquet from ${source}: ${detail}` : `Failed to parse GeoParquet: ${detail}`,
+      { cause: e },
+    );
+  }
+}
+
+async function parseGeoParquetInner(arrayBuffer: ArrayBuffer): Promise<arrow.Table> {
   const [{ readGeoParquet }, arrowMod] = await Promise.all([
     import('@geoarrow/geoparquet-wasm'),
     import('apache-arrow'),
@@ -48,22 +70,9 @@ export async function parseGeoParquet(arrayBuffer: ArrayBuffer): Promise<arrow.R
   // for us — calling `.free()` afterward would be a double-free and produce
   // a "null pointer passed to rust" runtime error.
   const ipc = readGeoParquet(buffer).intoIPCStream();
-  const batches = arrowMod.tableFromIPC(ipc).batches;
-  if (batches.length === 0) {
+  const table = arrowMod.tableFromIPC(ipc);
+  if (table.batches.length === 0) {
     throw new Error('GeoParquet file contained no record batches');
   }
-  if (batches.length > 1) {
-    // Upstream @geoarrow/deck.gl-geoarrow accepts a single RecordBatch as
-    // `data`. Combining N chunks into one Data per column means rewriting
-    // every column's buffers per-type — a bigger change than belongs in
-    // this loader. Surface loudly so the user can rewrite the file with
-    // a single row group, e.g.
-    //   pyarrow.parquet.write_table(t, path, row_group_size=len(t))
-    throw new Error(
-      `GeoParquet file produced ${batches.length} record batches but the GeoArrow layers ` +
-      `accept exactly one. Re-pack the file with a single row group ` +
-      `(e.g. write_table(table, path, row_group_size=len(table))).`,
-    );
-  }
-  return batches[0];
+  return table;
 }

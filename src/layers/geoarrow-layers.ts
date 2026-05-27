@@ -9,19 +9,11 @@ import type {
   GeoArrowPolygonLayerProps,
   GeoArrowScatterplotLayerProps,
 } from '@geoarrow/deck.gl-geoarrow';
+import type * as arrow from 'apache-arrow';
 
 import { GeoParquetLoader } from '../loaders/geoparquet-loader.js';
 
 type RenderLayersReturn = Layer | LayersList | null;
-
-interface ArrowVectorLike {
-  data?: unknown[];
-}
-
-interface ArrowBatchLike {
-  schema?: { fields?: unknown[] };
-  getChild?: (name: string) => ArrowVectorLike | null;
-}
 
 interface LayerLike {
   id?: string;
@@ -29,129 +21,66 @@ interface LayerLike {
   constructor: { defaultProps?: Record<string, unknown> };
 }
 
-export function isRecordBatch(value: unknown): value is ArrowBatchLike {
+export function isRecordBatch(value: unknown): value is arrow.RecordBatch {
+  if (typeof value !== 'object' || value === null) return false;
+  // Distinguish from arrow.Table: Table has a `batches` array, RecordBatch
+  // does not. Both share schema + getChild.
   return (
-    typeof value === 'object' &&
-    value !== null &&
     'schema' in value &&
     'getChild' in value &&
-    typeof (value as ArrowBatchLike).getChild === 'function'
+    typeof (value as { getChild: unknown }).getChild === 'function' &&
+    !('batches' in value)
   );
 }
 
-/**
- * deck.gl's JSON converter lowers `"@@=column"` into `row => get(row, "column")`
- * — see https://deck.gl/docs/api-reference/json/conversion-reference. We probe
- * the function with a recording Proxy: if it reads exactly one *distinct* key
- * during a single invocation, that key is the column name. Repeated reads of
- * the same key (e.g. `row.x * row.x`) still resolve. Multi-key reads
- * (`row.a + row.b`), nested paths (`row.a.b`, which throws via undefined),
- * and zero-key reads (the `@@=-` identity) return null — the caller is
- * expected to warn and fall through.
- */
-export function inferColumnReferenceFromFn(fn: (row: unknown) => unknown): string | null {
-  const accessed = new Set<string>();
-  const probe = new Proxy(
-    {},
-    {
-      get(_target, key) {
-        if (typeof key === 'string') accessed.add(key);
-        return undefined;
-      },
-    },
+export function isArrowTable(value: unknown): value is arrow.Table {
+  if (typeof value !== 'object' || value === null) return false;
+  return (
+    'schema' in value &&
+    'batches' in value &&
+    Array.isArray((value as { batches: unknown }).batches)
   );
-  try {
-    fn(probe);
-  } catch {
-    return null;
-  }
-  if (accessed.size !== 1) return null;
-  return accessed.values().next().value as string;
-}
-
-// Per-layer, per-prop warning dedupe so a hot render path doesn't spam.
-const WARNED = new WeakMap<object, Set<string>>();
-
-function warnOnce(layer: LayerLike, propName: string, message: string): void {
-  let seen = WARNED.get(layer);
-  if (!seen) {
-    seen = new Set();
-    WARNED.set(layer, seen);
-  }
-  if (seen.has(propName)) return;
-  seen.add(propName);
-  console.warn(`[${layer.id ?? 'GeoArrow layer'}] ${message}`);
 }
 
 /**
  * Walk every `get*` accessor declared in the layer class's `defaultProps`
  * (a closed set — we don't speculate over arbitrary `for...in` props) and
- * build a propName → arrow.Data map for those whose value is a column
- * reference: a literal string column name, or a function lowered from
- * `@@=column`. Returns null when nothing needed resolution.
+ * build a propName → arrow.Data map for those whose value is a bare string
+ * column name. Functions are left alone for upstream's per-row evaluation.
  *
- * For function accessors that look like an `@@=` lowering but don't
- * resolve to a single column, warn once so users don't stare at a blank
- * layer with no diagnostic.
+ * The supported shape is `getFillColor: "column_name"` — not
+ * `getFillColor: "@@=column_name"`. We don't try to peer into JSON-lowered
+ * expression closures: `@deck.gl/json` lowers expressions to opaque
+ * evaluator wrappers (`n => Jae(n, ast)`) whose column refs live in a
+ * captured AST, not in the function body, and the runtime probe needed to
+ * extract them silently mis-resolves on any non-trivial expression. The
+ * pydeck side should emit bare strings for column references on these
+ * layers; everything else passes through to upstream as-is.
+ *
+ * Returns null when nothing needed resolution.
  */
 export function resolveAccessors(
   layer: LayerLike,
-  batch: ArrowBatchLike,
+  batch: arrow.RecordBatch,
 ): Map<string, unknown> | null {
-  if (typeof batch.getChild !== 'function') return null;
   const accessorNames = Object.keys(layer.constructor.defaultProps ?? {})
     .filter(name => name.startsWith('get'));
   let map: Map<string, unknown> | null = null;
   for (const propName of accessorNames) {
     const value = layer.props[propName];
-    let columnName: string | null = null;
-    if (typeof value === 'string') {
-      columnName = value;
-    } else if (typeof value === 'function') {
-      columnName = inferColumnReferenceFromFn(value as (row: unknown) => unknown);
-      if (columnName === null) {
-        // Could be a hand-written row accessor that genuinely needs per-row
-        // evaluation — that's fine, upstream handles it. But a pydeck user
-        // who wrote `@@=row.foo + row.bar` will silently get the per-row
-        // path with no hint why their layer is slow. Surface it once.
-        if (isLikelyExpressionAccessor(value as (row: unknown) => unknown)) {
-          warnOnce(
-            layer,
-            propName,
-            `prop '${propName}' is a function accessor that doesn't resolve to a single ` +
-              `column. Falling back to per-row evaluation, which is slow on GeoArrow ` +
-              `layers. Use a single column reference (e.g. "@@=col_name") for best perf.`,
-          );
-        }
-        continue;
-      }
-    }
-    if (columnName === null) continue;
-    const vector = batch.getChild(columnName);
-    if (vector && Array.isArray(vector.data) && vector.data.length > 0) {
+    if (typeof value !== 'string') continue;
+    const vector = batch.getChild(value);
+    if (vector && vector.data.length > 0) {
       map ??= new Map();
       map.set(propName, vector.data[0]);
-    } else if (typeof value === 'string') {
-      warnOnce(
-        layer,
-        propName,
-        `prop '${propName}' references column '${columnName}', but the loaded ` +
-          `record batch has no such column.`,
+    } else {
+      console.warn(
+        `[${layer.id ?? 'GeoArrow layer'}] prop '${propName}' references column ` +
+          `'${value}', but the record batch has no such column.`,
       );
     }
   }
   return map;
-}
-
-/**
- * Heuristic: looks like a pydeck-generated `@@=` lowering rather than a
- * user-supplied row accessor. The JSON converter produces small arrow
- * functions; user-written accessors tend to be longer / multi-arg. Used
- * only to decide whether to emit a "per-row fallback" warning — false
- * negatives are fine, false positives just produce a one-time warning.
- */
-function isLikelyExpressionAccessor(fn: (row: unknown) => unknown): boolean {
-  return fn.length <= 1;
 }
 
 /**
@@ -206,11 +135,40 @@ export function renderWithResolvedAccessors<T extends LayerLike>(
   return superRenderLayers.call(thisProxy);
 }
 
+/**
+ * Multi-batch path: when `data` is an arrow.Table, instantiate one upstream
+ * layer per RecordBatch, each with per-batch accessor resolution and a
+ * derived id (so sub-layer ids don't collide across batches). Direct
+ * instantiation rather than the proxy trick because we also need a distinct
+ * `this.id` per batch — upstream's `getSubLayerProps` reads the instance
+ * property, not `props.id`, so shadowing props alone wouldn't be enough.
+ */
+function renderTableBatches(
+  LayerClass: new (props: Record<string, unknown>) => Layer,
+  layer: LayerLike,
+  table: arrow.Table,
+): LayersList {
+  const sublayers: Layer[] = [];
+  for (let i = 0; i < table.batches.length; i++) {
+    const batch = table.batches[i];
+    const resolved = resolveAccessors(layer, batch);
+    const subProps: Record<string, unknown> = {};
+    for (const key in layer.props) {
+      subProps[key] = resolved?.has(key) ? resolved.get(key) : layer.props[key];
+    }
+    subProps.data = batch;
+    subProps.id = `${layer.id ?? 'GeoArrowLayer'}-batch-${i}`;
+    sublayers.push(new LayerClass(subProps));
+  }
+  return sublayers;
+}
+
 // Thin subclasses that (a) inject our GeoParquet loader via defaultProps —
 // the loaders.gl 4.x per-layer convention, not the deprecated global
 // `registerLoaders` — and (b) route renderLayers through the column-
 // reference resolver so pydeck's `@@=column` sugar and bare column-name
-// strings both work as accessor sources for GeoArrow layers.
+// strings both work as accessor sources for GeoArrow layers. Multi-batch
+// arrow.Table inputs are split into one upstream sub-layer per batch.
 
 export class GeoArrowPathLayer<ExtraProps extends object = object> extends UpstreamGeoArrowPathLayer<ExtraProps> {
   static layerName = 'GeoArrowPathLayer';
@@ -223,6 +181,14 @@ export class GeoArrowPathLayer<ExtraProps extends object = object> extends Upstr
   };
 
   renderLayers(): RenderLayersReturn {
+    const data = this.props.data;
+    if (isArrowTable(data)) {
+      return renderTableBatches(
+        UpstreamGeoArrowPathLayer as unknown as new (p: Record<string, unknown>) => Layer,
+        this as unknown as LayerLike,
+        data,
+      );
+    }
     return renderWithResolvedAccessors(this as unknown as LayerLike, super.renderLayers);
   }
 }
@@ -235,6 +201,14 @@ export class GeoArrowScatterplotLayer<ExtraProps extends object = object> extend
   };
 
   renderLayers(): RenderLayersReturn {
+    const data = this.props.data;
+    if (isArrowTable(data)) {
+      return renderTableBatches(
+        UpstreamGeoArrowScatterplotLayer as unknown as new (p: Record<string, unknown>) => Layer,
+        this as unknown as LayerLike,
+        data,
+      );
+    }
     return renderWithResolvedAccessors(this as unknown as LayerLike, super.renderLayers);
   }
 }
@@ -247,6 +221,14 @@ export class GeoArrowPolygonLayer<ExtraProps extends object = object> extends Up
   };
 
   renderLayers(): RenderLayersReturn {
+    const data = this.props.data;
+    if (isArrowTable(data)) {
+      return renderTableBatches(
+        UpstreamGeoArrowPolygonLayer as unknown as new (p: Record<string, unknown>) => Layer,
+        this as unknown as LayerLike,
+        data,
+      );
+    }
     return renderWithResolvedAccessors(this as unknown as LayerLike, super.renderLayers);
   }
 }

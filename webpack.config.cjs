@@ -1,17 +1,17 @@
 const path = require('path');
 
-// Fail-fast assertion: the @geoarrow/geoparquet-wasm bundler entry must
-// exist where we expect it, because the `sideEffects: true` override in
-// `module.rules` below is keyed off that exact path. If upstream moves
-// the file, the override silently stops applying and the `__wbg_set_wasm`
-// call gets tree-shaken, producing runtime "wasm is undefined" errors.
-const GEOPARQUET_WASM_BUNDLER_ENTRY = require.resolve(
-  '@geoarrow/geoparquet-wasm/bundler/index.js'
+// Resolved up front so the sideEffects rule below scopes to wherever upstream
+// actually puts the bundler entry. If they move it, require.resolve throws
+// here — better than silently dropping the override and letting production
+// tree-shaking drop the wasm init (surface: runtime "null pointer passed to
+// rust" deep in the parquet parse).
+const GEOPARQUET_WASM_BUNDLER_DIR = path.dirname(
+  require.resolve('@geoarrow/geoparquet-wasm/bundler/index.js'),
 );
 
 module.exports = [
   {
-    mode: 'development',
+    mode: 'production',
     entry: './src/index.ts',
     output: {
       filename: './bundle.js',
@@ -65,10 +65,8 @@ module.exports = [
           // production tree-shaking, webpack would drop the entire module
           // top-level (including the wasm init) and runtime calls would hit
           // "null pointer passed to rust". This rule overrides the package
-          // declaration. Currently a no-op under `mode: 'development'` (dev
-          // mode doesn't enforce sideEffects-based tree-shaking) but
-          // load-bearing if/when we switch to production mode.
-          include: /node_modules[\\/]@geoarrow[\\/]geoparquet-wasm[\\/]bundler/,
+          // declaration.
+          include: GEOPARQUET_WASM_BUNDLER_DIR,
           sideEffects: true,
         },
         {
