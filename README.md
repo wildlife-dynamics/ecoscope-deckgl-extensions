@@ -1,12 +1,19 @@
 # ecoscope-deckgl-extensions
 
-Custom [deck.gl](https://deck.gl/) widgets and layers used by [Ecoscope](https://github.com/wildlife-dynamics/ecoscope). Built on `@deck.gl/core` 9.x and rendered with Preact. Bundled to a single UMD file (`dist/bundle.js`) that also attaches each export to `window` for embedding in non-bundled environments (e.g. notebook widgets).
+Custom [deck.gl](https://deck.gl/) widgets and layers used by [Ecoscope](https://github.com/wildlife-dynamics/ecoscope). Built on `@deck.gl/core` 9.x and rendered with Preact.
+
+Ships two artifacts from one source tree:
+
+- **ESM library** (`dist/index.js` + type declarations) — entry for bundler-based apps (ie Next.js).
+- **UMD bundle** (`dist/bundle.js`) — single-file build intended for pydeck's `customLibraries` script-tag loading. Attaches all exports to `window.EcoscopeDeckglExtensions`.
 
 ## Install
 
 ```bash
 npm install @ecoscope/ecoscope-deckgl-extensions
 ```
+
+`@deck.gl/*`, `@geoarrow/deck.gl-geoarrow`, and `apache-arrow` are peer dependencies — the consuming app provides them. `@geoarrow/geoparquet-wasm` is an optional peer (only needed if you load `.parquet` data through the GeoArrow layers).
 
 ```ts
 import {
@@ -17,8 +24,13 @@ import {
   SaveImageWidget,
   TooltipWidget,
   TiledBitmapLayer,
+  GeoArrowPathLayer,
+  GeoArrowScatterplotLayer,
+  GeoArrowPolygonLayer,
 } from '@ecoscope/ecoscope-deckgl-extensions';
 ```
+
+deck.gl is browser-only, so any component that constructs layers/widgets from this package must live behind a `'use client'` boundary (App Router) or be imported dynamically with `ssr: false`.
 
 ## Widgets
 
@@ -86,10 +98,28 @@ new TiledBitmapLayer({
 });
 ```
 
+### `GeoArrowPathLayer`, `GeoArrowScatterplotLayer`, `GeoArrowPolygonLayer`
+Thin subclasses of the corresponding [`@geoarrow/deck.gl-geoarrow`](https://github.com/geoarrow/deck.gl-geoarrow) layers that add:
+
+- A bundled GeoParquet loader (`.parquet` URLs in `data` are parsed in-browser via `@geoarrow/geoparquet-wasm`, wired in via `defaultProps.loaders` — no global `registerLoaders` call needed).
+- Bare-string column references on `get*` accessors.** Set `getFillColor: "color_column"` and the named column is bound directly as a vectorized arrow attribute on the upstream layer. Allows defining accessors in terms of columns via Pydeck.
+
+```ts
+new GeoArrowScatterplotLayer({
+  id: 'events',
+  data: 'https://example.com/events.parquet',
+  getFillColor: 'fill_color',   // column of FixedSizeList<Uint8>
+  getRadius: 'radius',          // column of Float
+});
+```
+
 ## Development
 
 ```bash
-npm run build-webpack   # bundle to dist/
+npm run build           # ESM library + UMD bundle to dist/
+npm run build:lib       # ESM library only (dist/index.js + .d.ts tree)
+npm run build:bundle    # UMD bundle only (dist/bundle.js) — for pydeck
+npm run build-webpack   # legacy alias for build:bundle
 npm run typecheck
 npm run lint
 ```

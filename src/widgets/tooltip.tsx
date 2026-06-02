@@ -4,7 +4,6 @@ import {
   Widget,
   WidgetPlacement,
 } from '@deck.gl/core';
-import './style.css';
 
 type LayerColumns = Record<string, string[] | null | undefined>;
 
@@ -71,11 +70,18 @@ function buildTooltip(info: PickingInfo, layerColumns: LayerColumns): TooltipRes
   const allowed = layerId ? layerColumns?.[layerId] : null;
   const filterByAllowed = Array.isArray(allowed);
 
+  // Read each field inside a try so one bad getter (e.g. an arrow column
+  // that throws on access) doesn't take out the whole tooltip.
   const rows: Array<[string, string]> = [];
-  for (const [key, value] of Object.entries(properties)) {
-    if (value === null || value === undefined || value === '') continue;
+  for (const key of Object.keys(properties)) {
     if (filterByAllowed && !allowed!.includes(key)) continue;
-    rows.push([key, formatValue(value)]);
+    try {
+      const value = properties[key];
+      if (value === null || value === undefined || value === '') continue;
+      rows.push([key, formatValue(value)]);
+    } catch (e) {
+      console.debug(`[TooltipWidget] failed to read or format property '${key}':`, e);
+    }
   }
 
   if (rows.length === 0) return null;
@@ -96,10 +102,21 @@ function buildTooltip(info: PickingInfo, layerColumns: LayerColumns): TooltipRes
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function formatValue(value: any): string {
+  if (typeof value === 'bigint') return value.toString();
+  if (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as { toISOString?: unknown }).toISOString === 'function'
+  ) {
+    return (value as Date).toISOString();
+  }
   if (typeof value === 'object') {
     try {
-      return JSON.stringify(value);
-    } catch {
+      return JSON.stringify(value, (_k, v) =>
+        typeof v === 'bigint' ? v.toString() : v,
+      );
+    } catch (e) {
+      console.debug('[TooltipWidget] JSON.stringify failed, falling back to String():', e);
       return String(value);
     }
   }

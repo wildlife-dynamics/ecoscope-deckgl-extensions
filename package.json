@@ -3,18 +3,26 @@
   "version": "0.0.8",
   "type": "module",
   "description": "Custom deck.gl components used by ecoscope",
-  "main": "index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./umd": "./dist/bundle.js",
+    "./package.json": "./package.json"
+  },
   "scripts": {
-    "build-webpack": "rm -rf ./dist && mkdir dist && webpack",
+    "build": "rm -rf dist && npm run build:lib && npm run build:bundle",
+    "build:lib": "tsup src/index.ts --format esm --dts --clean --target esnext --external preact --external @deck.gl/core --external @deck.gl/layers --external @deck.gl/geo-layers --external @deck.gl/widgets --external @deck.gl/aggregation-layers --external @geoarrow/deck.gl-geoarrow --external @geoarrow/geoparquet-wasm --external @loaders.gl/loader-utils --external apache-arrow",
+    "build:bundle": "webpack",
+    "build-webpack": "npm run build:bundle",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix"
   },
-  "exports": {
-    ".": "./dist/bundle.js"
-  },
   "files": [
-    "src",
     "dist"
   ],
   "author": "",
@@ -22,17 +30,37 @@
   "dependencies": {
     "html-to-image": "^1.11.13",
     "preact": "^10.26.9",
-    "preact-jsx-runtime": "^1.2.0",
-    "ts-loader": "^9.5.2"
+    "preact-jsx-runtime": "^1.2.0"
+  },
+  "peerDependencies": {
+    "@deck.gl/core": "^9.2.0",
+    "@deck.gl/geo-layers": "^9.2.0",
+    "@deck.gl/layers": "^9.2.0",
+    "@deck.gl/widgets": "^9.2.0",
+    "@geoarrow/deck.gl-geoarrow": "^0.4.0",
+    "@geoarrow/geoparquet-wasm": "^0.2.0-beta.5",
+    "apache-arrow": ">=21"
+  },
+  "peerDependenciesMeta": {
+    "@geoarrow/geoparquet-wasm": {
+      "optional": true
+    }
   },
   "devDependencies": {
-    "@deck.gl/core": "^9.2.1",
-    "@deck.gl/geo-layers": "^9.2.1",
-    "@deck.gl/layers": "^9.2.1",
-    "@deck.gl/widgets": "^9.2.1",
+    "@deck.gl/aggregation-layers": "~9.2.1",
+    "@deck.gl/core": "~9.2.1",
+    "@deck.gl/geo-layers": "~9.2.1",
+    "@deck.gl/layers": "~9.2.1",
+    "@deck.gl/widgets": "~9.2.1",
+    "@geoarrow/deck.gl-geoarrow": "^0.4.1",
+    "@geoarrow/geoparquet-wasm": "^0.2.0-beta.5",
+    "@loaders.gl/loader-utils": "~4.3.4",
+    "apache-arrow": "^21.1.0",
     "css-loader": "^7.1.2",
     "eslint": "^10.2.0",
     "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.2",
+    "tsup": "^8.5.1",
     "typescript-eslint": "^8.58.2",
     "webpack-cli": "^6.0.1"
   },
