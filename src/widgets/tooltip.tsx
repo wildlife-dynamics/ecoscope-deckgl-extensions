@@ -4,7 +4,6 @@ import {
   Widget,
   WidgetPlacement,
 } from '@deck.gl/core';
-import './style.css';
 
 type LayerColumns = Record<string, string[] | null | undefined>;
 

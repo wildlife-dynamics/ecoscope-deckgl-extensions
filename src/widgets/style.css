@@ -1,3 +1,9 @@
+.deck-widget.deck-widget-save-image .deck-widget-icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .deck-widget.ecoscope-title-widget {
   font-size: 26px;
   font-style: normal;
